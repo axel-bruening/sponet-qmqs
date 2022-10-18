@@ -63,7 +63,7 @@ class ImportCsvCommand extends Command
     $csv = Reader::createFromPath($file);
     $csv->setDelimiter(";");
     $csv->setEnclosure("\"");
-    $records = $csv->getRecords(['id', 'titel', 'auswerter', 'datum']);
+    $records = $csv->getRecords(['id', 'titel', 'auswerter', 'datum', 'quellenauswerter']);
     if (empty($records)) return Command::FAILURE;
 
     $io->info('Preparing import statements.');
@@ -80,12 +80,14 @@ class ImportCsvCommand extends Command
           ->setId((int)$record['id'])
           ->setTitel($record['titel'])
           ->setAuswerter($record['auswerter'])
-          ->setDatum($record['datum']);
+          ->setDatum($record['datum'])
+          ->setQuellenAuswerter($record['quellenauswerter']);
       } else {
         $row = $journal
           ->setTitel($record['titel'])
           ->setAuswerter($record['auswerter'])
-          ->setDatum($record['datum']);
+          ->setDatum($record['datum'])
+          ->setQuellenAuswerter($record['quellenauswerter']);
       }
       $this->em->persist($row);
     }

@@ -24,6 +24,9 @@ class Journals
   #[Assert\DateTime]
   private DateTime $Datum;
 
+  #[ORM\Column(type: 'string', length: 255, nullable: true)]
+  private ?string $QuellenAuswerter;
+
   public function getId(): ?int
   {
     return $this->id;
@@ -68,6 +71,18 @@ class Journals
   public function setDatum(DateTime $Datum): self
   {
     $this->Datum = $Datum;
+    return $this;
+  }
+
+  public function getQuellenAuswerter(): ?string
+  {
+    return $this->QuellenAuswerter;
+  }
+
+  public function setQuellenAuswerter(string $QuellenAuswerter): self
+  {
+    $this->QuellenAuswerter = $QuellenAuswerter;
+
     return $this;
   }
 }
