@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Repository\JournalsRepository;
 use DateTime;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -24,8 +26,13 @@ class Journals
   #[Assert\DateTime]
   private DateTime $Datum;
 
-  #[ORM\Column(type: 'string', length: 255, nullable: true)]
-  private ?string $QuellenAuswerter;
+  #[ORM\OneToMany(mappedBy: 'Zeitschrift', targetEntity: Records::class)]
+  private Collection $records;
+
+  public function __construct()
+  {
+    $this->records = new ArrayCollection();
+  }
 
   public function getId(): ?int
   {
@@ -74,14 +81,30 @@ class Journals
     return $this;
   }
 
-  public function getQuellenAuswerter(): ?string
+  /**
+   * @return Collection<int, Records>
+   */
+  public function getRecords(): Collection
   {
-    return $this->QuellenAuswerter;
+    return $this->records;
   }
 
-  public function setQuellenAuswerter(string $QuellenAuswerter): self
+  public function addRecord(Records $record): static
   {
-    $this->QuellenAuswerter = $QuellenAuswerter;
+    if (!$this->records->contains($record)) {
+      $this->records->add($record);
+      $record->setZeitschrift($this);
+    }
+
+    return $this;
+  }
+
+  public function removeRecord(Records $record): static
+  {
+    // set the owning side to null (unless already changed)
+    if ($this->records->removeElement($record) && $record->getZeitschrift() === $this) {
+      $record->setZeitschrift(null);
+    }
 
     return $this;
   }

@@ -2,10 +2,12 @@
 
 namespace App\Command;
 
-use App\Entity\Journals;
+use App\Controller\JournalImport;
+use App\Controller\RecordImport;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Csv\InvalidArgument;
 use League\Csv\Reader;
+use League\Csv\UnavailableStream;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -13,9 +15,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
+/**
+ *
+ */
 #[AsCommand(
   name: 'app:import-csv',
-  description: 'Imports a given CSV file into the database.',
+  description: 'Imports a given CSV file into the SPONET-QMQS database.',
   hidden: false
 )]
 class ImportCsvCommand extends Command
@@ -42,8 +47,9 @@ class ImportCsvCommand extends Command
   protected function configure(): void
   {
     $this
-      ->setHelp('This command allows you to import a CSV file into the database which was exported from SPONET with format CSV-ZS.')
-      ->addArgument('file', InputArgument::REQUIRED, 'Path to the file.');
+      ->setHelp('This command allows you to import a CSV file into the SPONET-QMQS database which was exported from SPONET.')
+      ->addArgument('file', InputArgument::REQUIRED, 'Path to the file.')
+      ->addArgument('type', InputArgument::REQUIRED, 'What type of data?');
   }
 
   /**
@@ -51,66 +57,37 @@ class ImportCsvCommand extends Command
    * @param OutputInterface $output
    * @return int
    * @throws InvalidArgument
+   * @throws UnavailableStream
    */
   protected function execute(InputInterface $input, OutputInterface $output): int
   {
     $io = new SymfonyStyle($input, $output);
     $file = $input->getArgument('file');
+    $type = $input->getArgument('type');
+    $result = false;
 
-    if (!is_file($file)) return Command::INVALID;
+    if (!is_file($file)) {
+      return Command::INVALID;
+    }
 
     $io->info('Trying to read: ' . $file);
     $csv = Reader::createFromPath($file);
+
     $csv->setDelimiter(";");
     $csv->setEnclosure("\"");
-    $records = $csv->getRecords(['id', 'titel', 'auswerter', 'datum', 'quellenauswerter']);
-    if (empty($records)) return Command::FAILURE;
 
-    $io->info('Preparing import statements.');
-    foreach ($records as $record) {
-      if ($this->invalidRow($record)) continue;
-      $record = $this->convertDate($record);
-      $journal = $this->em->getRepository(Journals::class)->find((int)$record['id']);
-      if (!$journal) {
-        if (gettype($record['datum']) == "boolean") {
-          $io->error("Erfassungsdatum von ID: $record[id] ist fehlerhaft");
-          return Command::FAILURE;
-        }
-        $row = (new Journals())
-          ->setId((int)$record['id'])
-          ->setTitel($record['titel'])
-          ->setAuswerter($record['auswerter'])
-          ->setDatum($record['datum'])
-          ->setQuellenAuswerter($record['quellenauswerter']);
-      } else {
-        $row = $journal
-          ->setTitel($record['titel'])
-          ->setAuswerter($record['auswerter'])
-          ->setDatum($record['datum'])
-          ->setQuellenAuswerter($record['quellenauswerter']);
-      }
-      $this->em->persist($row);
+    switch ($type) {
+      case 'journals':
+        $result = (new JournalImport($this->em))->import($csv, $io);
+        break;
+      case 'records':
+        $result = (new RecordImport($this->em))->import($csv, $io);
+        break;
     }
-    $io->info('Trying to import data.');
-    $this->em->flush();
 
-    $io->success('Import finished!');
-    return Command::SUCCESS;
+    if ($result) {
+      return Command::SUCCESS;
+    }
+    return Command::FAILURE;
   }
-
-  /**
-   * @param $record
-   * @return bool
-   */
-  protected function invalidRow($record): bool
-  {
-    return empty($record['id']);
-  }
-
-  protected function convertDate($record): array
-  {
-    $record['datum'] = \DateTime::createFromFormat('d.m.Y', $record['datum']);
-    return $record;
-  }
-
 }
